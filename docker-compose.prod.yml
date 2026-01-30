@@ -15,7 +15,7 @@ services:
       retries: 10
 
   api:
-    image: ghcr.io/${GHCR_OWNER}/${GHCR_IMAGE}:latest
+    image: ghcr.io/soraxganaa/volunteer:latest
     env_file:
       - .env
     depends_on:
