@@ -64,6 +64,7 @@ export default async function orgRoutes(app: any) {
 
   /**
    * 1) ORG_ADMIN -> create org (PENDING)
+   * POST /api/v1/orgs
    */
   const CreateOrgSchema = z.object({
     name: z.string().min(2),
@@ -74,7 +75,7 @@ export default async function orgRoutes(app: any) {
   });
 
   app.post(
-    "/orgs",
+    "/",
     { preHandler: [app.authenticate, app.requireRole(["ORG_ADMIN"])] },
     async (req: any, reply: any) => {
       const body = CreateOrgSchema.parse(req.body);
@@ -99,9 +100,10 @@ export default async function orgRoutes(app: any) {
 
   /**
    * 2) ORG_ADMIN -> list my orgs
+   * GET /api/v1/orgs/my
    */
   app.get(
-    "/orgs/my",
+    "/my",
     { preHandler: [app.authenticate, app.requireRole(["ORG_ADMIN"])] },
     async (req: any) => {
       const orgs = await app.db
@@ -117,20 +119,17 @@ export default async function orgRoutes(app: any) {
 
   /**
    * 3) PUBLIC -> get org detail
-   * - зөвхөн ACTIVE org-г public харна
-   * - org owner / superadmin бол ямар ч status-тай org-г харж болно
+   * GET /api/v1/orgs/:id
    */
-  app.get("/orgs/:id", async (req: any, reply: any) => {
+  app.get("/:id", async (req: any, reply: any) => {
     const orgId = String(req.params.id);
 
     const org = await getOrg(orgId);
     if (!org) return reply.notFound("Org not found");
 
-    // public access: only ACTIVE
-    // but if token exists and owner/superadmin -> allow
     const authHeader = req.headers?.authorization;
     if (org.status !== "ACTIVE") {
-      if (!authHeader) return reply.notFound("Org not found"); 
+      if (!authHeader) return reply.notFound("Org not found");
       try {
         const payload = await req.jwtVerify();
         const uid = String(payload.id ?? payload.sub ?? "");
@@ -149,8 +148,8 @@ export default async function orgRoutes(app: any) {
   });
 
   /**
-   * 4) ORG_ADMIN (owner) / SUPERADMIN -> update org profile
-   * status өөрчлөхгүй (approve/suspend тусдаа admin endpoint)
+   * 4) ORG_ADMIN(owner) / SUPERADMIN -> update org profile
+   * PATCH /api/v1/orgs/:id
    */
   const UpdateOrgSchema = z.object({
     name: z.string().min(2).optional(),
@@ -161,13 +160,12 @@ export default async function orgRoutes(app: any) {
   });
 
   app.patch(
-    "/orgs/:id",
+    "/:id",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
       const body = UpdateOrgSchema.parse(req.body);
 
-      // only owner org_admin or superadmin
       await assertOrgOwnerOrSuperadmin(req, reply, orgId);
 
       const updated = await app.db
@@ -189,100 +187,15 @@ export default async function orgRoutes(app: any) {
   );
 
   /**
-   * 5) SUPERADMIN -> list pending orgs (existing)
+   * STAFF APPLICATIONS
+   * POST /api/v1/orgs/:id/staff-applications
    */
-  app.get(
-    "/admin/orgs/pending",
-    { preHandler: [app.authenticate, app.requireRole(["SUPERADMIN"])] },
-    async () => {
-      const orgs = await app.db
-        .selectFrom("organizations")
-        .select(["id", "name", "status", "created_by", "created_at"])
-        .where("status", "=", "PENDING")
-        .orderBy("created_at", "asc")
-        .execute();
-
-      return { orgs };
-    }
-  );
-
-  /**
-   * 6) SUPERADMIN -> list all orgs (with optional status filter)
-   */
-  app.get(
-    "/admin/orgs",
-    { preHandler: [app.authenticate, app.requireRole(["SUPERADMIN"])] },
-    async (req: any) => {
-      const status = req.query?.status as string | undefined;
-
-      let q = app.db
-        .selectFrom("organizations")
-        .select(["id", "name", "status", "created_by", "created_at"])
-        .orderBy("created_at", "desc");
-
-      if (status) q = q.where("status", "=", status);
-
-      const orgs = await q.execute();
-      return { orgs };
-    }
-  );
-
-  /**
-   * 7) SUPERADMIN -> approve org (existing)
-   */
-  app.post(
-    "/admin/orgs/:id/approve",
-    { preHandler: [app.authenticate, app.requireRole(["SUPERADMIN"])] },
-    async (req: any, reply: any) => {
-      const orgId = String(req.params.id);
-
-      const updated = await app.db
-        .updateTable("organizations")
-        .set({ status: "ACTIVE" })
-        .where("id", "=", orgId as any)
-        .where("status", "=", "PENDING")
-        .returning(["id", "name", "status"])
-        .executeTakeFirst();
-
-      if (!updated) return reply.notFound("Org not found or not pending");
-      return { org: updated };
-    }
-  );
-
-  /**
-   * 8) SUPERADMIN -> suspend org (existing)
-   */
-  app.post(
-    "/admin/orgs/:id/suspend",
-    { preHandler: [app.authenticate, app.requireRole(["SUPERADMIN"])] },
-    async (req: any, reply: any) => {
-      const orgId = String(req.params.id);
-
-      const updated = await app.db
-        .updateTable("organizations")
-        .set({ status: "SUSPENDED" })
-        .where("id", "=", orgId as any)
-        .returning(["id", "name", "status"])
-        .executeTakeFirst();
-
-      if (!updated) return reply.notFound("Org not found");
-      return { org: updated };
-    }
-  );
-
-  /**
-   * ----------------------------------------------------
-   * STAFF APPLICATIONS (USER applies to become ORG_STAFF)
-   * ----------------------------------------------------
-   */
-
-  // USER -> apply to become staff
   const StaffApplySchema = z.object({
     message: z.string().max(1000).optional(),
   });
 
   app.post(
-    "/orgs/:id/staff-applications",
+    "/:id/staff-applications",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
@@ -297,7 +210,6 @@ export default async function orgRoutes(app: any) {
       if (!org) return reply.notFound("Org not found");
       if (org.status !== "ACTIVE") return reply.badRequest("Org is not active");
 
-      // if already staff -> conflict
       const alreadyStaff = await isOrgStaff(orgId, req.user.id);
       if (alreadyStaff) return reply.conflict("Already staff");
 
@@ -323,9 +235,9 @@ export default async function orgRoutes(app: any) {
     }
   );
 
-  // USER -> view my staff application for an org
+  // GET /api/v1/orgs/:id/staff-applications/my
   app.get(
-    "/orgs/:id/staff-applications/my",
+    "/:id/staff-applications/my",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
@@ -342,9 +254,9 @@ export default async function orgRoutes(app: any) {
     }
   );
 
-  // USER -> cancel my staff application (only if PENDING)
+  // DELETE /api/v1/orgs/:id/staff-applications/my
   app.delete(
-    "/orgs/:id/staff-applications/my",
+    "/:id/staff-applications/my",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
@@ -364,11 +276,11 @@ export default async function orgRoutes(app: any) {
   );
 
   /**
-   * ORG_ADMIN (owner) / SUPERADMIN -> list staff applications (read)
-   * query: ?status=PENDING
+   * ORG_ADMIN(owner) / SUPERADMIN -> list staff applications
+   * GET /api/v1/orgs/:id/staff-applications?status=PENDING
    */
   app.get(
-    "/orgs/:id/staff-applications",
+    "/:id/staff-applications",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
@@ -402,7 +314,8 @@ export default async function orgRoutes(app: any) {
   );
 
   /**
-   * ORG_ADMIN (owner) / SUPERADMIN -> decide staff application (approve/reject)
+   * ORG_ADMIN(owner) / SUPERADMIN -> decide staff application
+   * PATCH /api/v1/orgs/:id/staff-applications/:appId/decide
    */
   const DecideStaffSchema = z.object({
     decision: z.enum(["APPROVED", "REJECTED"]),
@@ -410,7 +323,7 @@ export default async function orgRoutes(app: any) {
   });
 
   app.patch(
-    "/orgs/:id/staff-applications/:appId/decide",
+    "/:id/staff-applications/:appId/decide",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
@@ -420,7 +333,6 @@ export default async function orgRoutes(app: any) {
       await assertOrgOwnerOrgAdminOrSuperadmin(req, reply, orgId);
 
       const result = await app.db.transaction().execute(async (trx: any) => {
-        // fetch application
         const row = await trx
           .selectFrom("org_staff_applications")
           .select(["id", "org_id", "user_id", "status"])
@@ -431,7 +343,6 @@ export default async function orgRoutes(app: any) {
         if (!row) return { kind: "NOT_FOUND" as const };
         if (row.status !== "PENDING") return { kind: "NOT_PENDING" as const };
 
-        // update application status
         const updatedApp = await trx
           .updateTable("org_staff_applications")
           .set({
@@ -445,7 +356,6 @@ export default async function orgRoutes(app: any) {
           .executeTakeFirst();
 
         if (body.decision === "APPROVED") {
-          // upsert org_members: insert staff membership
           await trx
             .insertInto("org_members")
             .values({
@@ -454,7 +364,9 @@ export default async function orgRoutes(app: any) {
               org_role: "STAFF",
               status: "ACTIVE",
             })
-            .onConflict((oc: any) => oc.columns(["org_id", "user_id"]).doUpdateSet({ status: "ACTIVE" }))
+            .onConflict((oc: any) =>
+              oc.columns(["org_id", "user_id"]).doUpdateSet({ status: "ACTIVE" })
+            )
             .execute();
         }
 
@@ -469,14 +381,13 @@ export default async function orgRoutes(app: any) {
   );
 
   /**
-   * ----------------------------------------------------
    * ORG STAFF list / remove
-   * ----------------------------------------------------
+   * GET /api/v1/orgs/:id/staff
+   * DELETE /api/v1/orgs/:id/staff/:userId
+   * GET /api/v1/orgs/:id/is-staff
    */
-
-  // ORG_ADMIN(owner)/SUPERADMIN -> list active staff members
   app.get(
-    "/orgs/:id/staff",
+    "/:id/staff",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
@@ -504,9 +415,8 @@ export default async function orgRoutes(app: any) {
     }
   );
 
-  // ORG_ADMIN(owner)/SUPERADMIN -> remove staff (soft suspend)
   app.delete(
-    "/orgs/:id/staff/:userId",
+    "/:id/staff/:userId",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const orgId = String(req.params.id);
@@ -527,9 +437,8 @@ export default async function orgRoutes(app: any) {
     }
   );
 
-  // Auth user -> check if current user is staff of org
   app.get(
-    "/orgs/:id/is-staff",
+    "/:id/is-staff",
     { preHandler: [app.authenticate] },
     async (req: any) => {
       const orgId = String(req.params.id);

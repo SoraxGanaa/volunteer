@@ -2,7 +2,7 @@ import { ApplySchema, DecideSchema, ListApplicationsQuerySchema } from "./schema
 import { isAppError } from "./errors";
 import * as svc from "./service";
 
-export default async function applicationRoutes(app: any) {
+export default async function eventApplicationRoutes(app: any) {
   const handle = (reply: any, e: any) => {
     if (isAppError(e)) {
       if (e.httpStatus === 400) return reply.badRequest(e.message);
@@ -15,8 +15,9 @@ export default async function applicationRoutes(app: any) {
     throw e;
   };
 
+  // POST /api/v1/events/:id/apply
   app.post(
-    "/events/:id/apply",
+    "/:id/apply",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any, reply: any) => {
       try {
@@ -31,8 +32,9 @@ export default async function applicationRoutes(app: any) {
     }
   );
 
+  // DELETE /api/v1/events/:id/apply
   app.delete(
-    "/events/:id/apply",
+    "/:id/apply",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any, reply: any) => {
       try {
@@ -45,8 +47,9 @@ export default async function applicationRoutes(app: any) {
     }
   );
 
+  // GET /api/v1/events/:id/applications?status=
   app.get(
-    "/events/:id/applications",
+    "/:id/applications",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       try {
@@ -60,8 +63,9 @@ export default async function applicationRoutes(app: any) {
     }
   );
 
+  // PATCH /api/v1/events/:id/applications/:appId/decide
   app.patch(
-    "/events/:id/applications/:appId/decide",
+    "/:id/applications/:appId/decide",
     { preHandler: [app.authenticate, app.requireRole(["ORG_ADMIN", "SUPERADMIN"])] },
     async (req: any, reply: any) => {
       try {
@@ -79,19 +83,6 @@ export default async function applicationRoutes(app: any) {
         );
 
         return { application: updated };
-      } catch (e) {
-        return handle(reply, e);
-      }
-    }
-  );
-
-  app.get(
-    "/me/applications",
-    { preHandler: [app.authenticate] },
-    async (req: any, reply: any) => {
-      try {
-        const list = await svc.listMyApplications(app.db, req.user);
-        return { applications: list };
       } catch (e) {
         return handle(reply, e);
       }

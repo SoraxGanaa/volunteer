@@ -13,7 +13,8 @@ export default async function authRoutes(app: any) {
     })
     .refine((v) => v.email || v.phone, { message: "email or phone required" });
 
-  app.post("/auth/register", async (req: any, reply: any) => {
+  // ✅ /register (prefix-ээр /api/v1/auth/register болно)
+  app.post("/register", async (req: any, reply: any) => {
     const body = RegisterSchema.parse(req.body);
 
     const password_hash = await hashPassword(body.password);
@@ -50,21 +51,21 @@ export default async function authRoutes(app: any) {
         accessToken: token,
       });
     } catch (e: any) {
-      // unique constraint conflict (email/phone)
       return reply.conflict("Email/phone already exists");
     }
   });
 
-  // Login (by email or phone)
   const LoginSchema = z.object({
     identifier: z.string().trim().min(3),
     password: z.string().min(6),
   });
 
-  app.post("/auth/login", async (req: any, reply: any) => {
+  // ✅ /login (prefix-ээр /api/v1/auth/login)
+  app.post("/login", async (req: any, reply: any) => {
     const body = LoginSchema.parse(req.body);
     const ident = body.identifier.trim();
     const emailIdent = ident.includes("@") ? ident.toLowerCase() : ident;
+
     const user = await app.db
       .selectFrom("users")
       .select(["id", "role", "email", "phone", "password_hash", "status"])
@@ -77,8 +78,7 @@ export default async function authRoutes(app: any) {
       .executeTakeFirst();
 
     if (!user) return reply.unauthorized("Invalid credentials");
-    if (user.status !== "ACTIVE")
-      return reply.forbidden("Account is not active");
+    if (user.status !== "ACTIVE") return reply.forbidden("Account is not active");
 
     const ok = await verifyPassword(body.password, user.password_hash);
     if (!ok) return reply.unauthorized("Invalid credentials");
@@ -99,7 +99,8 @@ export default async function authRoutes(app: any) {
     });
   });
 
-  app.get("/auth/me", { preHandler: [app.authenticate] }, async (req: any) => {
+  // ✅ /me (prefix-ээр /api/v1/auth/me)
+  app.get("/me", { preHandler: [app.authenticate] }, async (req: any) => {
     return { user: req.user };
   });
 }

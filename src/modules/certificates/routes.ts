@@ -2,8 +2,9 @@ import { CreateCertSchema, UpdateCertSchema } from "./schemas";
 import * as svc from "./service";
 
 export default async function certificateRoutes(app: any) {
+  // POST /api/v1/me/certificates
   app.post(
-    "/me/certificates",
+    "/certificates",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any, reply: any) => {
       const body = CreateCertSchema.parse(req.body);
@@ -12,8 +13,9 @@ export default async function certificateRoutes(app: any) {
     }
   );
 
+  // GET /api/v1/me/certificates
   app.get(
-    "/me/certificates",
+    "/certificates",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any) => {
       const certificates = await svc.listCerts(app.db, req.user);
@@ -21,8 +23,9 @@ export default async function certificateRoutes(app: any) {
     }
   );
 
+  // PATCH /api/v1/me/certificates/:id
   app.patch(
-    "/me/certificates/:id",
+    "/certificates/:id",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any, reply: any) => {
       const id = String(req.params.id);
@@ -35,8 +38,9 @@ export default async function certificateRoutes(app: any) {
     }
   );
 
+  // DELETE /api/v1/me/certificates/:id
   app.delete(
-    "/me/certificates/:id",
+    "/certificates/:id",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any, reply: any) => {
       const id = String(req.params.id);
@@ -46,8 +50,9 @@ export default async function certificateRoutes(app: any) {
     }
   );
 
+  // GET /api/v1/me/history
   app.get(
-    "/me/history",
+    "/history",
     { preHandler: [app.authenticate, app.requireRole(["USER"])] },
     async (req: any) => {
       const history = await svc.myHistory(app.db, req.user);

@@ -2,8 +2,9 @@ import { MarkAttendanceSchema } from "./schemas";
 import * as svc from "./service";
 
 export default async function attendanceRoutes(app: any) {
+  // PUT /api/v1/events/:eventId/attendance/:userId
   app.put(
-    "/events/:eventId/attendance/:userId",
+    "/:eventId/attendance/:userId",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const eventId = String(req.params.eventId);
@@ -14,14 +15,16 @@ export default async function attendanceRoutes(app: any) {
 
       if (r.kind === "NOT_FOUND") return reply.notFound("Event not found");
       if (r.kind === "FORBIDDEN") return reply.forbidden("Forbidden");
-      if (r.kind === "NOT_APPROVED") return reply.badRequest("User is not approved for this event");
+      if (r.kind === "NOT_APPROVED")
+        return reply.badRequest("User is not approved for this event");
 
       return { ok: true };
     }
   );
 
+  // GET /api/v1/events/:eventId/attendance
   app.get(
-    "/events/:eventId/attendance",
+    "/:eventId/attendance",
     { preHandler: [app.authenticate] },
     async (req: any, reply: any) => {
       const eventId = String(req.params.eventId);
