@@ -12,7 +12,8 @@ export default async function orgEventRoutes(app: any) {
       .executeTakeFirst();
 
     if (!org) return reply.notFound("Org not found");
-    if (String(org.created_by) !== String(req.user.id)) return reply.forbidden("Forbidden");
+    if (String(org.created_by) !== String(req.user.id))
+      return reply.forbidden("Forbidden");
   }
 
   /**
@@ -22,6 +23,7 @@ export default async function orgEventRoutes(app: any) {
   const CreateEventSchema = z.object({
     title: z.string().min(2),
     description: z.string().max(5000).optional(),
+    bannerUrl: z.string().url().optional(),
     category: z.string().max(100).optional(),
     city: z.string().max(100).optional(),
     address: z.string().max(200).optional(),
@@ -52,7 +54,8 @@ export default async function orgEventRoutes(app: any) {
 
       const start_at = new Date(body.startAt);
       const end_at = body.endAt ? new Date(body.endAt) : null;
-      if (end_at && end_at < start_at) return reply.badRequest("endAt must be >= startAt");
+      if (end_at && end_at < start_at)
+        return reply.badRequest("endAt must be >= startAt");
 
       const event = await app.db
         .insertInto("events")
@@ -61,6 +64,7 @@ export default async function orgEventRoutes(app: any) {
           created_by: req.user.id,
           title: body.title,
           description: body.description ?? null,
+          banner_url: body.bannerUrl ?? null, 
           category: body.category ?? null,
           city: body.city ?? null,
           address: body.address ?? null,
@@ -71,11 +75,12 @@ export default async function orgEventRoutes(app: any) {
           capacity: body.capacity ?? 0,
           status: "DRAFT",
         })
+
         .returning(["id", "title", "status", "start_at"])
         .executeTakeFirst();
 
       return reply.code(201).send({ event });
-    }
+    },
   );
 
   /**
@@ -97,6 +102,6 @@ export default async function orgEventRoutes(app: any) {
         .execute();
 
       return { events };
-    }
+    },
   );
 }

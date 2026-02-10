@@ -49,7 +49,8 @@ export default async function eventRoutes(app: any) {
       .executeTakeFirst();
 
     if (!org) return reply.notFound("Org not found");
-    if (String(org.created_by) !== String(req.user.id)) return reply.forbidden("Forbidden");
+    if (String(org.created_by) !== String(req.user.id))
+      return reply.forbidden("Forbidden");
   }
 
   /**
@@ -67,6 +68,7 @@ export default async function eventRoutes(app: any) {
       .select([
         "e.id",
         "e.title",
+        "e.banner_url", 
         "e.city",
         "e.start_at",
         "e.end_at",
@@ -74,6 +76,7 @@ export default async function eventRoutes(app: any) {
         "e.status",
         "o.name as org_name",
       ])
+
       .where("e.status", "=", "PUBLISHED")
       .where("o.status", "=", "ACTIVE")
       .orderBy("e.start_at", "asc");
@@ -110,7 +113,12 @@ export default async function eventRoutes(app: any) {
    */
   app.post(
     "/:id/publish",
-    { preHandler: [app.authenticate, app.requireRole(["ORG_ADMIN", "SUPERADMIN"])] },
+    {
+      preHandler: [
+        app.authenticate,
+        app.requireRole(["ORG_ADMIN", "SUPERADMIN"]),
+      ],
+    },
     async (req: any, reply: any) => {
       const eventId = String(req.params.id);
       const e = await getEvent(eventId);
@@ -120,8 +128,10 @@ export default async function eventRoutes(app: any) {
         await assertOrgOwnerOrSuper(req, reply, String(e.org_id));
       }
 
-      if (e.org_status !== "ACTIVE") return reply.badRequest("Org is not active");
-      if (e.status !== "DRAFT") return reply.badRequest("Only DRAFT can be published");
+      if (e.org_status !== "ACTIVE")
+        return reply.badRequest("Org is not active");
+      if (e.status !== "DRAFT")
+        return reply.badRequest("Only DRAFT can be published");
 
       const updated = await app.db
         .updateTable("events")
@@ -131,12 +141,17 @@ export default async function eventRoutes(app: any) {
         .executeTakeFirst();
 
       return { event: updated };
-    }
+    },
   );
 
   app.post(
     "/:id/cancel",
-    { preHandler: [app.authenticate, app.requireRole(["ORG_ADMIN", "SUPERADMIN"])] },
+    {
+      preHandler: [
+        app.authenticate,
+        app.requireRole(["ORG_ADMIN", "SUPERADMIN"]),
+      ],
+    },
     async (req: any, reply: any) => {
       const eventId = String(req.params.id);
       const e = await getEvent(eventId);
@@ -154,12 +169,17 @@ export default async function eventRoutes(app: any) {
         .executeTakeFirst();
 
       return { event: updated };
-    }
+    },
   );
 
   app.post(
     "/:id/complete",
-    { preHandler: [app.authenticate, app.requireRole(["ORG_ADMIN", "SUPERADMIN"])] },
+    {
+      preHandler: [
+        app.authenticate,
+        app.requireRole(["ORG_ADMIN", "SUPERADMIN"]),
+      ],
+    },
     async (req: any, reply: any) => {
       const eventId = String(req.params.id);
       const e = await getEvent(eventId);
@@ -177,7 +197,7 @@ export default async function eventRoutes(app: any) {
         .executeTakeFirst();
 
       return { event: updated };
-    }
+    },
   );
 
   /**
@@ -194,10 +214,11 @@ export default async function eventRoutes(app: any) {
 
       const ok =
         req.user.role === "SUPERADMIN" ||
-        (req.user.role === "ORG_ADMIN" && String(e.org_owner) === String(req.user.id)) ||
+        (req.user.role === "ORG_ADMIN" &&
+          String(e.org_owner) === String(req.user.id)) ||
         (await isOrgStaff(String(e.org_id), String(req.user.id)));
 
       return { isStaff: ok };
-    }
+    },
   );
 }

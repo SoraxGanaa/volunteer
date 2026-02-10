@@ -53,6 +53,7 @@ export interface DB {
 
   events: {
     id: Generated<string>;
+    banner_url: string | null;
     org_id: string;
     created_by: string | null;
     title: string;
